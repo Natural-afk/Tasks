@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Traffic Light Controller</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #f0f0f0, #e6f7ff);
+      text-align: center;
+      padding: 40px;
+      margin: 0;
+    }
+
+    h1 {
+      color: #333;
+      font-size: 2.5rem;
+      margin-bottom: 30px;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    button {
+      border: none;
+      padding: 15px 30px;
+      font-size: 1.2rem;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+      color: white;
+    }
+
+    button.red { background-color: #e74c3c; }
+    button.red:hover { background-color: #c0392b; }
+
+    button.yellow { background-color: #f1c40f; color: #333; }
+    button.yellow:hover { background-color: #d4ac0d; }
+
+    button.green { background-color: #2ecc71; }
+    button.green:hover { background-color: #27ae60; }
+
+    button.off { background-color: #95a5a6; }
+    button.off:hover { background-color: #7f8c8d; }
+
+    #status {
+      font-size: 1.2rem;
+      margin-top: 15px;
+      color: #555;
+    }
+
+    .footer {
+      margin-top: 60px;
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🚦 Remote Traffic Light Controller</h1>
+
+  <div class="button-container">
+    <button class="red" onclick="setCommand('red')">🔴 Red</button>
+    <button class="yellow" onclick="setCommand('yellow')">🟡 Yellow</button>
+    <button class="green" onclick="setCommand('green')">🟢 Green</button>
+    <button class="off" onclick="setCommand('none')">⚪ Off</button>
+  </div>
+
+  <div id="status">Current status: N/A</div>
+
+  <div class="footer">
+    Powered by Arduino + Firebase | SIT122 HD Task
+  </div>
+
+  <script>
+    // Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyD7WeUR3FwMNDRGtvUovl6ExZo5WCJN8MM",
+      authDomain: "remotetrafficcontrol-36828.firebaseapp.com",
+      databaseURL: "https://remotetrafficcontrol-36828-default-rtdb.firebaseio.com",
+      projectId: "remotetrafficcontrol-36828",
+      storageBucket: "remotetrafficcontrol-36828.firebasestorage.app",
+      messagingSenderId: "899608376689",
+      appId: "1:899608376689:web:9c0c2ad164415c8afa72d0",
+      measurementId: "G-HW8WVZLP34"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function setCommand(command) {
+      db.ref("traffic").set({ command: command })
+        .then(() => {
+          document.getElementById("status").innerText = "Current status: " + command.toUpperCase();
+        })
+        .catch((error) => {
+          console.error("Firebase write error:", error);
+          document.getElementById("status").innerText = "Error setting command.";
+        });
+    }
+  </script>
+
+</body>
+</html>
+
