@@ -1,12 +1,13 @@
-#include "DHT.h"
+#include <DHT.h>
+#include "SAMDTimerInterrupt.h"
 
 // === Pin Assignments ===
-const int buttonPin = 2;
-const int pirPin = 3;
-const int dhtPin = 12;
-const int led1Pin = 10; // Red
-const int led2Pin = 5;  // Blue
-const int led3Pin = 8;  // Yellow
+const int buttonPin = 7;
+const int led1Pin = 2;  // Red LED (toggle with button)
+const int led2Pin = 3;  // Orange LED (PIR motion)
+const int led3Pin = 4;  // Green LED (timer interrupt)
+const int pirPin = 11;  // PIR OUT
+const int dhtPin = 10;  // DHT22 DATA
 
 // === DHT Setup ===
 #define DHTTYPE DHT22
@@ -24,13 +25,20 @@ volatile bool led1State = false;
 unsigned long lastButtonInterrupt = 0;
 const unsigned long debounceDelay = 200;
 
-// === Timer for LED3 ===
-bool led3State = false;
-unsigned long lastLED3Toggle = 0;
-const unsigned long led3Interval = 1000;
+// === Timer Interrupt Setup ===
+#define TIMER_INTERVAL_MS 1000
+SAMDTimer ITimer(TIMER_TC3);  // Use TC3 (you can try TC4 or TC5 if needed)
+volatile bool led3State = false;
+
+// === Timer ISR ===
+void toggleLED3() {
+  led3State = !led3State;
+  digitalWrite(led3Pin, led3State);
+}
 
 void setup() {
   Serial.begin(115200);
+  while (!Serial);  // Wait for Serial Monitor to open 
   delay(1000);
 
   dht.begin();
@@ -44,22 +52,29 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(buttonPin), handleButtonInterrupt, FALLING);
   attachInterrupt(digitalPinToInterrupt(pirPin), handleMotionInterrupt, RISING);
 
-  Serial.println("System Ready: DHT22 + PIR + Button + Timer");
+  // Start hardware timer interrupt using SAMDTimerInterrupt
+  if (ITimer.attachInterruptInterval(TIMER_INTERVAL_MS * 1000, toggleLED3)) {
+    Serial.println("✅ Timer interrupt started successfully");
+  } else {
+    Serial.println("❌ Failed to start timer interrupt");
+  }
+
+  Serial.println("✅ System Ready: DHT22 + PIR + Button + Hardware Timer Interrupt");
 }
 
 void loop() {
   unsigned long now = millis();
 
-  // === DHT22 Read ===
+  // === DHT22 Read Every 5s ===
   if (now - lastDHTRead >= dhtInterval) {
     float temp = dht.readTemperature();
     float hum = dht.readHumidity();
 
     if (!isnan(temp) && !isnan(hum)) {
-      Serial.print("Temp: "); Serial.print(temp); Serial.print(" °C | ");
-      Serial.print("Humidity: "); Serial.print(hum); Serial.println(" %");
+      Serial.print(" Temp: "); Serial.print(temp); Serial.print(" °C | ");
+      Serial.print(" Humidity: "); Serial.print(hum); Serial.println(" %");
     } else {
-      Serial.println("Failed to read from DHT22");
+      Serial.println(" Failed to read from DHT22");
     }
 
     lastDHTRead = now;
@@ -67,8 +82,8 @@ void loop() {
 
   // === PIR Motion → LED2 briefly
   if (motionDetected) {
-    Serial.println("Motion interrupt → LED2 ON");
-    activateOnlyLED(led2Pin);
+    Serial.println("🚶 PIR interrupt → LED2 ON");
+    digitalWrite(led2Pin, HIGH);
     delay(1000);
     digitalWrite(led2Pin, LOW);
     motionDetected = false;
@@ -77,42 +92,26 @@ void loop() {
   // === Button → Toggle LED1
   digitalWrite(led1Pin, led1State ? HIGH : LOW);
 
-  // === LED3 Timer Toggle
-  if (now - lastLED3Toggle >= led3Interval) {
-    led3State = !led3State;
-    Serial.println("LED3 toggled (timer)");
-    activateOnlyLED(led3State ? led3Pin : -1);  // Turn on if true, else off
-    lastLED3Toggle = now;
-  }
+  // === LED3 is toggled automatically in the timer ISR
 }
 
-// === Interrupt Handlers ===
+// === Button ISR
 void handleButtonInterrupt() {
   unsigned long now = millis();
   if (now - lastButtonInterrupt > debounceDelay) {
     led1State = !led1State;
-    Serial.print("Button interrupt → LED1: ");
+    Serial.print(" Button interrupt → LED1: ");
     Serial.println(led1State ? "ON" : "OFF");
     lastButtonInterrupt = now;
   }
 }
 
+// === PIR ISR
 void handleMotionInterrupt() {
   unsigned long now = millis();
   if (now - lastMotionTime > pirCooldown) {
     motionDetected = true;
     lastMotionTime = now;
-  }
-}
-
-// === Utility: Only one LED ON at a time
-void activateOnlyLED(int activePin) {
-  digitalWrite(led1Pin, LOW);
-  digitalWrite(led2Pin, LOW);
-  digitalWrite(led3Pin, LOW);
-
-  if (activePin >= 0) {
-    digitalWrite(activePin, HIGH);
   }
 }
 
